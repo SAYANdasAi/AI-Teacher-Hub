@@ -5,4 +5,4 @@ SpeechRecognition
 pyttsx3
 googletrans==4.0.0-rc1
 gTTS
-PyAudio
+PyAudio==0.2.11
