@@ -111,42 +111,29 @@ model = genai.GenerativeModel(
     }
 )
 
-# Speech recognition function with live output
+# Speech recognition function using Google Web Speech API (no PyAudio required)
 def recognize_speech(language_code="en-US"):
     recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("Listening...")
-        recognizer.adjust_for_ambient_noise(source)
-        try:
-            # Listen to the audio only once
+    st.info("Listening...")
+    try:
+        # Use the default microphone as the audio source
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source)
             audio = recognizer.listen(source, timeout=5)
-            result = recognizer.recognize_google(audio, language=language_code, show_all=True)
-            
-            if result and 'alternative' in result:
-                # Extract the full recognized text
-                full_text = result['alternative'][0]['transcript']
-                
-                # Simulate live output by displaying text in chunks
-                text = ""
-                words = full_text.split()  # Split the text into words
-                for word in words:
-                    text += word + " "
-                    st.text(f"Recognized: {text}")
-                    time.sleep(0.5)  # Add a small delay for the live effect
-                
-                return text.strip()
-            else:
-                st.error("No speech detected. Please try again.")
-                return ""
-        except sr.UnknownValueError:
-            st.error("Could not understand audio. Please try again.")
-            return ""
-        except sr.RequestError:
-            st.error("Speech recognition service is unavailable. Check your internet connection.")
-            return ""
-        except sr.WaitTimeoutError:
-            st.error("No speech detected. Please speak again.")
-            return ""
+        
+        # Recognize speech using Google Web Speech API
+        text = recognizer.recognize_google(audio, language=language_code)
+        st.success("Speech recognized!")
+        return text
+    except sr.UnknownValueError:
+        st.error("Could not understand audio. Please try again.")
+        return ""
+    except sr.RequestError:
+        st.error("Speech recognition service is unavailable. Check your internet connection.")
+        return ""
+    except sr.WaitTimeoutError:
+        st.error("No speech detected. Please speak again.")
+        return ""
 
 # Text-to-Speech function using gTTS
 def speak_text(text, lang="en"):
