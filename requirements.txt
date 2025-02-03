@@ -1,8 +1,6 @@
-streamlit
-python-dotenv
-google-generativeai
-SpeechRecognition
-pyttsx3
+streamlit 
+python-dotenv 
+google-generativeai 
+speechrecognition 
+gtts 
 googletrans==4.0.0-rc1
-gTTS
-PyAudio==0.2.11
