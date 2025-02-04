@@ -7,6 +7,7 @@ import speech_recognition as sr
 from gtts import gTTS
 from googletrans import Translator, LANGUAGES
 import time
+import threading
 
 # Must be the first Streamlit command
 st.set_page_config(page_title="AI Teachers Hub", layout="wide")
@@ -95,6 +96,10 @@ if 'chat_history' not in st.session_state:
 if 'user_query' not in st.session_state:
     st.session_state.user_query = ""
 
+# Initialize session state for speech recognition
+if 'listening' not in st.session_state:
+    st.session_state.listening = False
+
 # Load environment variables
 load_dotenv()
 
@@ -115,30 +120,30 @@ model = genai.GenerativeModel(
     }
 )
 
-# Speech recognition function using Google Web Speech API (no PyAudio required)
+# Speech recognition function using Google Web Speech API
 def recognize_speech(language_code="en-US"):
     recognizer = sr.Recognizer()
-    st.info("Listening...")
+    st.session_state.listening = True
+    st.info("Listening... Speak now!")
     try:
-        # Use an uploaded audio file for speech recognition
-        audio_file = st.file_uploader("Upload an audio file", type=["wav"])
-        if audio_file:
-            with sr.AudioFile(audio_file) as source:
-                audio = recognizer.record(source)
-            
-            # Recognize speech using Google Web Speech API
-            text = recognizer.recognize_google(audio, language=language_code)
-            st.success("Speech recognized!")
-            return text
-        else:
-            st.warning("Please upload an audio file.")
-            return ""
-    except sr.UnknownValueError:
-        st.error("Could not understand audio. Please try again.")
-        return ""
-    except sr.RequestError:
-        st.error("Speech recognition service is unavailable. Check your internet connection.")
-        return ""
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source)
+            while st.session_state.listening:
+                audio = recognizer.listen(source, timeout=5)
+                try:
+                    text = recognizer.recognize_google(audio, language=language_code)
+                    st.session_state.user_query = text
+                    st.success("Speech recognized!")
+                    st.session_state.listening = False
+                    break
+                except sr.UnknownValueError:
+                    st.error("Could not understand audio. Please try again.")
+                except sr.RequestError:
+                    st.error("Speech recognition service is unavailable. Check your internet connection.")
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+    finally:
+        st.session_state.listening = False
 
 # Text-to-Speech function using gTTS
 def speak_text(text, lang="en"):
@@ -173,20 +178,23 @@ with st.sidebar:
     st.markdown("### 📏 Response Size")
     response_size = st.select_slider("Select answer length", options=["Brief", "Moderate", "Detailed"], value="Moderate")
     
+    # Quick topics
+    st.markdown("### 🎯 Quick Topics")
+    subject_choice = st.selectbox("Select Subject", list(subjects.keys()), format_func=lambda x: f"{subjects[x]} {x}")
+    selected_topic = st.radio("Select a topic:", subject_topics[subject_choice])
+    
     # Speech recording
     st.markdown("### 🎤 Speak Your Question")
     if st.button("🎙️ Start Recording"):
-        st.session_state.user_query = recognize_speech(language_code=language_code)
+        if not st.session_state.listening:
+            threading.Thread(target=recognize_speech, args=(language_code,)).start()
+    
+    if st.button("⏹️ Stop Listening"):
+        st.session_state.listening = False
+        st.info("Listening stopped.")
 
 # Main chat area
-st.markdown("### 📚 Select Subject")
-subject_choice = st.selectbox("", list(subjects.keys()), format_func=lambda x: f"{subjects[x]} {x}")
-
-# Display subject-specific quick topics
-st.markdown("### 🎯 Quick Topics")
-selected_topic = st.radio("Select a topic:", subject_topics[subject_choice])
-
-# User query input
+st.markdown("### 📚 Enter Your Question")
 st.session_state.user_query = st.text_area("", placeholder=f"Enter your {subject_choice} question here...", height=80, value=st.session_state.user_query)
 
 # Get Answer button
