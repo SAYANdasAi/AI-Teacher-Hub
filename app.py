@@ -13,14 +13,18 @@ st.set_page_config(page_title="AI Teachers Hub", layout="wide")
 
 # Define subjects dictionary at the top level
 subjects = {
-    "Data Science": "📊",
-    "Machine Learning": "🤖",
-    "Deep Learning": "🧠",
-    "Artificial Intelligence": "🦾",
-    "DBMS": "💾",
-    "Statistics": "📈",
-    "Python": "🐍",
-    "R": "📉"
+    "Physics": "⚛️",
+    "Chemistry": "🧪",
+    "Maths": "🧮",
+    "Biology": "🧬"
+}
+
+# Define subject-specific quick topics
+subject_topics = {
+    "Physics": ["Kinematics", "Thermodynamics", "Electromagnetism", "Quantum Mechanics"],
+    "Chemistry": ["Organic Chemistry", "Inorganic Chemistry", "Physical Chemistry", "Analytical Chemistry"],
+    "Maths": ["Calculus", "Algebra", "Geometry", "Statistics"],
+    "Biology": ["Genetics", "Ecology", "Cell Biology", "Evolution"]
 }
 
 # Custom CSS for compact and futuristic UI
@@ -116,23 +120,24 @@ def recognize_speech(language_code="en-US"):
     recognizer = sr.Recognizer()
     st.info("Listening...")
     try:
-        # Use the default microphone as the audio source
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            audio = recognizer.listen(source, timeout=5)
-        
-        # Recognize speech using Google Web Speech API
-        text = recognizer.recognize_google(audio, language=language_code)
-        st.success("Speech recognized!")
-        return text
+        # Use an uploaded audio file for speech recognition
+        audio_file = st.file_uploader("Upload an audio file", type=["wav"])
+        if audio_file:
+            with sr.AudioFile(audio_file) as source:
+                audio = recognizer.record(source)
+            
+            # Recognize speech using Google Web Speech API
+            text = recognizer.recognize_google(audio, language=language_code)
+            st.success("Speech recognized!")
+            return text
+        else:
+            st.warning("Please upload an audio file.")
+            return ""
     except sr.UnknownValueError:
         st.error("Could not understand audio. Please try again.")
         return ""
     except sr.RequestError:
         st.error("Speech recognition service is unavailable. Check your internet connection.")
-        return ""
-    except sr.WaitTimeoutError:
-        st.error("No speech detected. Please speak again.")
         return ""
 
 # Text-to-Speech function using gTTS
@@ -164,11 +169,6 @@ with st.sidebar:
     st.markdown("### 🌍 Choose Language")
     language_code = st.selectbox("Select Language", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x].capitalize(), index=list(LANGUAGES.keys()).index("en"))
     
-    # Quick topics
-    st.markdown("### 🎯 Quick Topics")
-    topics = ["Algorithms", "Neural Networks", "Data Structures", "SQL"]
-    selected_topic = st.radio("Select a topic:", topics)
-    
     # Response size
     st.markdown("### 📏 Response Size")
     response_size = st.select_slider("Select answer length", options=["Brief", "Moderate", "Detailed"], value="Moderate")
@@ -182,6 +182,10 @@ with st.sidebar:
 st.markdown("### 📚 Select Subject")
 subject_choice = st.selectbox("", list(subjects.keys()), format_func=lambda x: f"{subjects[x]} {x}")
 
+# Display subject-specific quick topics
+st.markdown("### 🎯 Quick Topics")
+selected_topic = st.radio("Select a topic:", subject_topics[subject_choice])
+
 # User query input
 st.session_state.user_query = st.text_area("", placeholder=f"Enter your {subject_choice} question here...", height=80, value=st.session_state.user_query)
 
@@ -189,13 +193,13 @@ st.session_state.user_query = st.text_area("", placeholder=f"Enter your {subject
 if st.button("🚀 Get Answer"):
     if st.session_state.user_query.strip():
         with st.spinner(f'🤔 {subject_choice} teacher is thinking...'):
-            # Modify the prompt based on response_size
+            # Modify the prompt based on response_size and selected topic
             if response_size == "Brief":
-                prompt = f"Provide a brief answer to the following question: {st.session_state.user_query}"
+                prompt = f"Provide a brief answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
             elif response_size == "Moderate":
-                prompt = f"Provide a moderate-length answer to the following question: {st.session_state.user_query}"
+                prompt = f"Provide a moderate-length answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
             elif response_size == "Detailed":
-                prompt = f"Provide a detailed and comprehensive answer to the following question: {st.session_state.user_query}"
+                prompt = f"Provide a detailed and comprehensive answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
             
             # Generate the response using the modified prompt
             response = model.generate_content(prompt).text
