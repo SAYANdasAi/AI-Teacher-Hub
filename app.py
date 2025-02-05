@@ -7,25 +7,28 @@ import speech_recognition as sr
 from gtts import gTTS
 from googletrans import Translator, LANGUAGES
 import time
-import threading
 
 # Must be the first Streamlit command
 st.set_page_config(page_title="AI Teachers Hub", layout="wide")
 
-# Define subjects dictionary at the top level
+# Define Class 12th Science subjects dictionary
 subjects = {
-    "Physics": "⚛️",
-    "Chemistry": "🧪",
-    "Maths": "🧮",
-    "Biology": "🧬"
+    "Physics": "🌌",
+    "Chemistry": "⚗️",
+    "Biology": "🧬",
+    "Mathematics": "🧮",
+    "Computer Science": "💻",
+    "English": "📖"
 }
 
-# Define subject-specific quick topics
+# Define quick topics for each subject
 subject_topics = {
-    "Physics": ["Kinematics", "Thermodynamics", "Electromagnetism", "Quantum Mechanics"],
-    "Chemistry": ["Organic Chemistry", "Inorganic Chemistry", "Physical Chemistry", "Analytical Chemistry"],
-    "Maths": ["Calculus", "Algebra", "Geometry", "Statistics"],
-    "Biology": ["Genetics", "Ecology", "Cell Biology", "Evolution"]
+    "Physics": ["Electrostatics", "Optics", "Magnetism", "Modern Physics", "Thermodynamics"],
+    "Chemistry": ["Organic Chemistry", "Inorganic Chemistry", "Physical Chemistry", "Chemical Kinetics", "Electrochemistry"],
+    "Biology": ["Genetics", "Ecology", "Human Physiology", "Biotechnology", "Evolution"],
+    "Mathematics": ["Calculus", "Algebra", "Probability", "Trigonometry", "Coordinate Geometry"],
+    "Computer Science": ["Python Programming", "SQL", "Data Structures", "Algorithms", "Networking"],
+    "English": ["Literature", "Grammar", "Writing Skills", "Comprehension", "Poetry"]
 }
 
 # Custom CSS for compact and futuristic UI
@@ -96,10 +99,6 @@ if 'chat_history' not in st.session_state:
 if 'user_query' not in st.session_state:
     st.session_state.user_query = ""
 
-# Initialize session state for speech recognition
-if 'listening' not in st.session_state:
-    st.session_state.listening = False
-
 # Load environment variables
 load_dotenv()
 
@@ -120,30 +119,29 @@ model = genai.GenerativeModel(
     }
 )
 
-# Speech recognition function using Google Web Speech API
+# Speech recognition function using Google Web Speech API (no PyAudio required)
 def recognize_speech(language_code="en-US"):
     recognizer = sr.Recognizer()
-    st.session_state.listening = True
-    st.info("Listening... Speak now!")
+    st.info("Listening...")
     try:
+        # Use the default microphone as the audio source
         with sr.Microphone() as source:
             recognizer.adjust_for_ambient_noise(source)
-            while st.session_state.listening:
-                audio = recognizer.listen(source, timeout=5)
-                try:
-                    text = recognizer.recognize_google(audio, language=language_code)
-                    st.session_state.user_query = text
-                    st.success("Speech recognized!")
-                    st.session_state.listening = False
-                    break
-                except sr.UnknownValueError:
-                    st.error("Could not understand audio. Please try again.")
-                except sr.RequestError:
-                    st.error("Speech recognition service is unavailable. Check your internet connection.")
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-    finally:
-        st.session_state.listening = False
+            audio = recognizer.listen(source, timeout=5)
+        
+        # Recognize speech using Google Web Speech API
+        text = recognizer.recognize_google(audio, language=language_code)
+        st.success("Speech recognized!")
+        return text
+    except sr.UnknownValueError:
+        st.error("Could not understand audio. Please try again.")
+        return ""
+    except sr.RequestError:
+        st.error("Speech recognition service is unavailable. Check your internet connection.")
+        return ""
+    except sr.WaitTimeoutError:
+        st.error("No speech detected. Please speak again.")
+        return ""
 
 # Text-to-Speech function using gTTS
 def speak_text(text, lang="en"):
@@ -174,40 +172,39 @@ with st.sidebar:
     st.markdown("### 🌍 Choose Language")
     language_code = st.selectbox("Select Language", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x].capitalize(), index=list(LANGUAGES.keys()).index("en"))
     
+    # Quick topics
+    st.markdown("### 🎯 Quick Topics")
+    selected_subject = st.session_state.get("selected_subject", "Physics")  # Default subject
+    if selected_subject in subject_topics:
+        selected_topic = st.radio("Select a topic:", subject_topics[selected_subject])
+    
     # Response size
     st.markdown("### 📏 Response Size")
     response_size = st.select_slider("Select answer length", options=["Brief", "Moderate", "Detailed"], value="Moderate")
     
-    # Quick topics
-    st.markdown("### 🎯 Quick Topics")
-    subject_choice = st.selectbox("Select Subject", list(subjects.keys()), format_func=lambda x: f"{subjects[x]} {x}")
-    selected_topic = st.radio("Select a topic:", subject_topics[subject_choice])
-    
     # Speech recording
     st.markdown("### 🎤 Speak Your Question")
     if st.button("🎙️ Start Recording"):
-        if not st.session_state.listening:
-            threading.Thread(target=recognize_speech, args=(language_code,)).start()
-    
-    if st.button("⏹️ Stop Listening"):
-        st.session_state.listening = False
-        st.info("Listening stopped.")
+        st.session_state.user_query = recognize_speech(language_code=language_code)
 
 # Main chat area
-st.markdown("### 📚 Enter Your Question")
+st.markdown("### 📚 Select Subject")
+subject_choice = st.selectbox("", list(subjects.keys()), format_func=lambda x: f"{subjects[x]} {x}", key="selected_subject")
+
+# User query input
 st.session_state.user_query = st.text_area("", placeholder=f"Enter your {subject_choice} question here...", height=80, value=st.session_state.user_query)
 
 # Get Answer button
 if st.button("🚀 Get Answer"):
     if st.session_state.user_query.strip():
         with st.spinner(f'🤔 {subject_choice} teacher is thinking...'):
-            # Modify the prompt based on response_size and selected topic
+            # Modify the prompt based on response_size
             if response_size == "Brief":
-                prompt = f"Provide a brief answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
+                prompt = f"Provide a brief answer to the following question: {st.session_state.user_query}"
             elif response_size == "Moderate":
-                prompt = f"Provide a moderate-length answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
+                prompt = f"Provide a moderate-length answer to the following question: {st.session_state.user_query}"
             elif response_size == "Detailed":
-                prompt = f"Provide a detailed and comprehensive answer to the following {subject_choice} question about {selected_topic}: {st.session_state.user_query}"
+                prompt = f"Provide a detailed and comprehensive answer to the following question: {st.session_state.user_query}"
             
             # Generate the response using the modified prompt
             response = model.generate_content(prompt).text
@@ -237,4 +234,4 @@ if st.button("🚀 Get Answer"):
 
 # Footer
 st.markdown("---")
-st.markdown("<div style='text-align: center'><p>Made with ❤️ for students everywhere</p></div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center'><p>Made with ❤️ for Class 12th Science students</p></div>", unsafe_allow_html=True)
